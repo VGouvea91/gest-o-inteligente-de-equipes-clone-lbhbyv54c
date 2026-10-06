@@ -1,15 +1,15 @@
 {
-  "generatedAt": "2026-10-06T19:22:04.616Z",
+  "generatedAt": "2026-10-06T19:23:01.345Z",
   "collections": [
     {
       "name": "users",
       "type": "auth",
       "apiRules": {
-        "list": "id = @request.auth.id",
-        "view": "id = @request.auth.id",
+        "list": "id = @request.auth.id || (organization = @request.auth.organization && @request.auth.role = 'admin')",
+        "view": "id = @request.auth.id || (organization = @request.auth.organization && @request.auth.role = 'admin')",
         "create": "",
-        "update": "id = @request.auth.id",
-        "delete": "id = @request.auth.id"
+        "update": "@request.auth.id != '' && (id = @request.auth.id || (organization = @request.auth.organization && @request.auth.role = 'admin'))",
+        "delete": "@request.auth.id != '' && @request.auth.role = 'admin' && organization = @request.auth.organization"
       },
       "fields": [
         {
@@ -29,19 +29,1088 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        },
+        {
+          "name": "role",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "admin",
+            "manager",
+            "member"
+          ]
+        },
+        {
+          "name": "needs_password_setup",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "organizations"
         }
       ],
       "indexes": [
         "CREATE UNIQUE INDEX `idx_tokenKey__pb_users_auth_` ON `users` (`tokenKey`)",
         "CREATE UNIQUE INDEX `idx_email__pb_users_auth_` ON `users` (`email`) WHERE `email` != ''"
+      ]
+    },
+    {
+      "name": "teams",
+      "type": "base",
+      "apiRules": {
+        "list": "organization = @request.auth.organization && @request.auth.id != ''",
+        "view": "organization = @request.auth.organization && @request.auth.id != ''",
+        "create": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "update": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "delete": "@request.auth.id != '' && @request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "owner",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        },
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "organizations"
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_teams_owner ON teams (owner)"
+      ]
+    },
+    {
+      "name": "members",
+      "type": "base",
+      "apiRules": {
+        "list": "team.organization = @request.auth.organization && @request.auth.id != ''",
+        "view": "team.organization = @request.auth.organization && @request.auth.id != ''",
+        "create": "team.organization = @request.auth.organization && @request.auth.id != '' && @request.auth.role = 'admin'",
+        "update": "team.organization = @request.auth.organization && @request.auth.id != '' && (@request.auth.role = 'admin' || user = @request.auth.id)",
+        "delete": "team.organization = @request.auth.organization && @request.auth.id != '' && @request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "user",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "team",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "teams"
+        },
+        {
+          "name": "role",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "admin",
+            "member"
+          ]
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "online",
+            "away",
+            "busy",
+            "offline"
+          ]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_members_user_team ON members (user, team)"
+      ]
+    },
+    {
+      "name": "tasks",
+      "type": "base",
+      "apiRules": {
+        "list": "organization = @request.auth.organization && @request.auth.id != ''",
+        "view": "organization = @request.auth.organization && @request.auth.id != ''",
+        "create": "organization = @request.auth.organization && @request.auth.id != '' && @request.auth.role = 'admin'",
+        "update": "organization = @request.auth.organization && @request.auth.id != ''",
+        "delete": "organization = @request.auth.organization && @request.auth.id != '' && @request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "team",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "teams"
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "todo",
+            "doing",
+            "done"
+          ]
+        },
+        {
+          "name": "priority",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        {
+          "name": "assignee",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "due_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "vector",
+          "type": "vector",
+          "required": false,
+          "system": false,
+          "vectorDimensions": 1536,
+          "vectorDistance": "cosine"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        },
+        {
+          "name": "estimate",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "spent",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "key_result",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "key_results"
+        },
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "organizations"
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_tasks_team_status ON tasks (team, status)"
+      ]
+    },
+    {
+      "name": "feedback",
+      "type": "base",
+      "apiRules": {
+        "list": "organization = @request.auth.organization && @request.auth.id != ''",
+        "view": "organization = @request.auth.organization && @request.auth.id != ''",
+        "create": "organization = @request.auth.organization && @request.auth.id != ''",
+        "update": "organization = @request.auth.organization && @request.auth.id != '' && @request.auth.role = 'admin'",
+        "delete": "organization = @request.auth.organization && @request.auth.id != '' && @request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "sender",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "receiver",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "content",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "sentiment",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        },
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "organizations"
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "objectives",
+      "type": "base",
+      "apiRules": {
+        "list": "organization = @request.auth.organization && @request.auth.id != ''",
+        "view": "organization = @request.auth.organization && @request.auth.id != ''",
+        "create": "organization = @request.auth.organization && @request.auth.id != '' && @request.auth.role = 'admin'",
+        "update": "organization = @request.auth.organization && @request.auth.id != '' && @request.auth.role = 'admin'",
+        "delete": "organization = @request.auth.organization && @request.auth.id != '' && @request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "title",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "team",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "teams"
+        },
+        {
+          "name": "owner",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "start_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "end_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "active",
+            "completed",
+            "archived"
+          ]
+        },
+        {
+          "name": "progress",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        },
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "organizations"
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_objectives_team ON objectives (team)",
+        "CREATE INDEX idx_objectives_status ON objectives (status)"
+      ]
+    },
+    {
+      "name": "key_results",
+      "type": "base",
+      "apiRules": {
+        "list": "organization = @request.auth.organization && @request.auth.id != ''",
+        "view": "organization = @request.auth.organization && @request.auth.id != ''",
+        "create": "organization = @request.auth.organization && @request.auth.id != '' && @request.auth.role = 'admin'",
+        "update": "organization = @request.auth.organization && @request.auth.id != '' && @request.auth.role = 'admin'",
+        "delete": "organization = @request.auth.organization && @request.auth.id != '' && @request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "objective",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "objectives"
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "target",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "current",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "unit",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "on_track",
+            "at_risk",
+            "off_track",
+            "completed"
+          ]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        },
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "organizations"
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_key_results_objective ON key_results (objective)"
+      ]
+    },
+    {
+      "name": "comments",
+      "type": "base",
+      "apiRules": {
+        "list": "organization = @request.auth.organization && @request.auth.id != ''",
+        "view": "organization = @request.auth.organization && @request.auth.id != ''",
+        "create": "organization = @request.auth.organization && @request.auth.id != ''",
+        "update": "organization = @request.auth.organization && @request.auth.id != '' && author = @request.auth.id",
+        "delete": "organization = @request.auth.organization && @request.auth.id != '' && author = @request.auth.id"
+      },
+      "fields": [
+        {
+          "name": "task",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "tasks"
+        },
+        {
+          "name": "author",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "body",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        },
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "organizations"
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_comments_task ON comments (task)"
+      ]
+    },
+    {
+      "name": "activities",
+      "type": "base",
+      "apiRules": {
+        "list": "organization = @request.auth.organization && @request.auth.id != ''",
+        "view": "organization = @request.auth.organization && @request.auth.id != ''",
+        "create": "organization = @request.auth.organization && @request.auth.id != ''",
+        "update": "organization = @request.auth.organization && @request.auth.id != ''",
+        "delete": "organization = @request.auth.organization && @request.auth.id != '' && @request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "user",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "task",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "tasks"
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "metadata",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        },
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "organizations"
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_activities_user ON activities (user)",
+        "CREATE INDEX idx_activities_task ON activities (task)"
+      ]
+    },
+    {
+      "name": "ai_alerts",
+      "type": "base",
+      "apiRules": {
+        "list": "organization = @request.auth.organization && @request.auth.id != ''",
+        "view": "organization = @request.auth.organization && @request.auth.id != ''",
+        "create": "organization = @request.auth.organization && @request.auth.id != ''",
+        "update": "organization = @request.auth.organization && @request.auth.id != '' && @request.auth.role = 'admin'",
+        "delete": "organization = @request.auth.organization && @request.auth.id != '' && @request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "type",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "bottleneck",
+            "delay",
+            "okr_deviation",
+            "velocity_drop",
+            "focus_loss",
+            "overload"
+          ]
+        },
+        {
+          "name": "severity",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "info",
+            "warning",
+            "critical"
+          ]
+        },
+        {
+          "name": "message",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "team",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "teams"
+        },
+        {
+          "name": "context",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "resolved",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        },
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "organizations"
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_ai_alerts_team ON ai_alerts (team)",
+        "CREATE INDEX idx_ai_alerts_severity ON ai_alerts (severity)",
+        "CREATE INDEX idx_ai_alerts_resolved ON ai_alerts (resolved)"
+      ]
+    },
+    {
+      "name": "ai_recommendations",
+      "type": "base",
+      "apiRules": {
+        "list": "organization = @request.auth.organization && @request.auth.id != ''",
+        "view": "organization = @request.auth.organization && @request.auth.id != ''",
+        "create": "organization = @request.auth.organization && @request.auth.id != ''",
+        "update": "organization = @request.auth.organization && @request.auth.id != '' && @request.auth.role = 'admin'",
+        "delete": "organization = @request.auth.organization && @request.auth.id != '' && @request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "alert",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "ai_alerts"
+        },
+        {
+          "name": "suggestion",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "priority",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        {
+          "name": "action_type",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "reassign",
+            "adjust_deadline",
+            "focus_kr",
+            "review",
+            "other"
+          ]
+        },
+        {
+          "name": "acted_on",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        },
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "organizations"
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_ai_recs_alert ON ai_recommendations (alert)"
+      ]
+    },
+    {
+      "name": "performance_snapshots",
+      "type": "base",
+      "apiRules": {
+        "list": "organization = @request.auth.organization && @request.auth.id != ''",
+        "view": "organization = @request.auth.organization && @request.auth.id != ''",
+        "create": "organization = @request.auth.organization && @request.auth.id != ''",
+        "update": "organization = @request.auth.organization && @request.auth.id != '' && @request.auth.role = 'admin'",
+        "delete": "organization = @request.auth.organization && @request.auth.id != '' && @request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "user",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "team",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "teams"
+        },
+        {
+          "name": "date",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "tasks_done",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tasks_active",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "velocity",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "focus_score",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "overdue_tasks",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        },
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "organizations"
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_perf_user_date ON performance_snapshots (user, date)",
+        "CREATE INDEX idx_perf_team ON performance_snapshots (team)"
+      ]
+    },
+    {
+      "name": "organizations",
+      "type": "base",
+      "apiRules": {
+        "list": "owner = @request.auth.id || id = @request.auth.organization",
+        "view": "owner = @request.auth.id || id = @request.auth.organization",
+        "create": "@request.auth.id != ''",
+        "update": "owner = @request.auth.id",
+        "delete": "owner = @request.auth.id"
+      },
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "slug",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "owner",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "plan",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "free",
+            "pro",
+            "enterprise"
+          ]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_org_owner ON organizations (owner)",
+        "CREATE UNIQUE INDEX idx_org_slug ON organizations (slug)"
+      ]
+    },
+    {
+      "name": "org_memberships",
+      "type": "base",
+      "apiRules": {
+        "list": "user = @request.auth.id && @request.auth.id != ''",
+        "view": "user = @request.auth.id && @request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != '' && (@request.auth.role = 'admin' || user = @request.auth.id)",
+        "delete": "@request.auth.id != '' && @request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "user",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "role",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "admin",
+            "member"
+          ]
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "online",
+            "away",
+            "busy",
+            "offline"
+          ]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_memberships_user ON org_memberships (user)",
+        "CREATE INDEX idx_memberships_org ON org_memberships (organization)",
+        "CREATE UNIQUE INDEX idx_memberships_user_org ON org_memberships (user, organization)"
       ]
     }
   ]
